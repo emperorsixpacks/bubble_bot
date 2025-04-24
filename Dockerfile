@@ -42,12 +42,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_CACHE_DIR=/cache/uv
 
 # Copy only requirements first for better caching
-COPY pyproject.toml poetry.lock ./
 
 # Install uv and dependencies with cache
-RUN --mount=type=cache,target=/cache/uv \
-    pip install --upgrade uv && \
-    uv pip install -e .
 
 # Stage 4: Final image with application code
 FROM python-env as runtime
@@ -59,5 +55,7 @@ RUN apt-get remove --purge -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+WORKDIR /GitHub/bubble_bot
+RUN --mount=type=cache,target=/cache/uv pip install --upgrade uv && uv sync
 WORKDIR /GitHub/bubble_bot/src
 CMD ["uv", "run", "utils.py"]
