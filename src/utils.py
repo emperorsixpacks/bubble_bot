@@ -1,7 +1,7 @@
 import os
 
-import imgkit
 import httpx
+import imgkit
 
 
 def return_base_dir():
@@ -26,6 +26,7 @@ def save_html_as_screenshot(html_file, output_image="screenshot.png"):
     options = {
         "format": "png",
         "encoding": "UTF-8",
+        "enable-local-file-access": None,
     }
     imgkit.from_file(html_file, output_image, options=options)
     print(f"Screenshot saved to {output_image}")
