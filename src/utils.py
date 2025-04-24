@@ -32,4 +32,4 @@ def save_html_as_screenshot(html_file, output_image="screenshot.png"):
 
 
 # Usage
-save_html_as_screenshot("/home/adavid/Documents/GitHub/bubble_telegram_bot/static/token.html")
+save_html_as_screenshot("../static/token.html")
