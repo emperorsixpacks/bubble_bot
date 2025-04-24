@@ -28,9 +28,7 @@ RUN apt-get update && apt-get install -y \
     lm-sensors \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.bullseye_amd64.deb
-
-RUN dpkg -i wkhtmltox_0.12.6.1-2.bullseye_amd64.deb
+RUN wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.bullseye_amd64.deb && dpkg -i wkhtmltox_0.12.6.1-2.bullseye_amd64.deb && rm wkhtmltox_0.12.6.1-2.bullseye_amd64.deb 
 
 # Create the mini vm's code directory
 RUN mkdir -p /GitHub/bubble_bot
