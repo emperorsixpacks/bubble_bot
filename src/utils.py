@@ -1,7 +1,10 @@
 import os
+from io import BytesIO
+from pathlib import Path
 
 import httpx
 import imgkit
+from jinja2 import Environment, FileSystemLoader
 
 
 def return_base_dir():
@@ -14,23 +17,32 @@ async def send_request(url: str):
         return response
 
 
-def ensure_screenshots_directory():
-    base_dir = return_base_dir()
-    upload_dir = os.path.join(base_dir, "screenshots")
-    if not os.path.exists(upload_dir):
-        os.makedirs(upload_dir)
-    return upload_dir
-
-
-def save_html_as_screenshot(html_file, output_image="screenshot.png"):
+def save_html_as_screenshot(html_file):
     options = {
         "format": "png",
         "encoding": "UTF-8",
         "enable-local-file-access": None,
     }
-    imgkit.from_file(html_file, output_image, options=options)
-    print(f"Screenshot saved to {output_image}")
+    img_bytes = imgkit.from_file(html_file, False, options=options)
+    return BytesIO(img_bytes)
 
 
-# Usage
-save_html_as_screenshot("../static/token.html")
+def render_html_template(template_path: str, token: dict, metrics) -> str:
+    # Verify template exists
+    if not Path(template_path).exists():
+        raise FileNotFoundError(f"Template file not found: {template_path}")
+
+    # Set up Jinja environment
+    template_dir = str(Path(template_path).parent)
+    template_file = Path(template_path).name
+
+    env = Environment(
+        loader=FileSystemLoader(template_dir),
+        autoescape=True,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+    # Render template with context
+    template = env.get_template(template_file)
+    return template.render(token=token, metrics=metrics)

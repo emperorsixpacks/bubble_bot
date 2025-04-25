@@ -1,4 +1,5 @@
 import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.utils import return_base_dir
@@ -14,3 +15,10 @@ class AppSettings(BaseSettings):
 
 class TelegramSettings(AppSettings):
     telegram_bot_token: str
+
+
+class IBMSettings(AppSettings):
+    ibm_service_endpoint: str
+    ibm_bucket_name: str
+    ibm_bucket_instance_id: str
+    ibm_api_key: str

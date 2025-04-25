@@ -4,9 +4,7 @@ from urllib.parse import urlencode
 from playwright.async_api import async_playwright
 
 from service_types import TokenCoinData, TokenCommunityData, TokenMetrics
-from utils import ensure_screenshots_directory, send_request
-
-ensure_screenshots_directory()
+from utils import render_html_template, send_request
 
 BUBBLE_MAPS_API_URL = "https://api-legacy.bubblemaps.io"
 ELEMENTS_TO_REMOVE = [
@@ -61,6 +59,7 @@ async def get_token_data(*, contract_address: str, chain: str):
         white_paper=data.get("links", {}).get("whitepaper", None),
         twitter_handle=data.get("links", {}).get("twitter_screen_name", None),
         twitter_followers=data.get("community_data", {}).get("twitter_followers", None),
+        token_image_url=data.get("image", {}).get("large", ""),
         telegram_channel=data.get("links", {}).get("telegram_channel_identifier", None),
         repo=(
             data.get("links", {}).get("repos_url", {}).get("github", [None])[0]
@@ -77,10 +76,11 @@ async def get_token_data(*, contract_address: str, chain: str):
         name=data.get("name", ""),
         description=data.get("description", {}).get("en", ""),
         bubble_screenshot_url=None,  # Not available in the API response
-        token_image_url=data.get("image", {}).get("large", ""),
         market_cap=int(market_data.get("market_cap", {}).get("usd", 0)),
         volume=int(market_data.get("total_volume", {}).get("usd", 0)),
         price=float(market_data.get("current_price", {}).get("usd", 0)),
+        total_supply=data.get("market_data", {}).get("total_supply", None),
+        circulating_supply=data.get("market_data", {}).get("circulating_supply", None),
         community_data=community_data,
     )
 
@@ -93,7 +93,7 @@ async def get_bubble_map_screenshot(chain: str, contract_address: str):
         await page.goto(
             f"https://app.bubblemaps.io/{chain}/token/{contract_address}?mode=0"
         )
-        await asyncio.sleep(3)
+        await asyncio.sleep(5)
         await page.evaluate(
             "document.querySelectorAll('{0}').forEach(el => el.remove());".format(
                 ",".join(ELEMENTS_TO_REMOVE)
@@ -104,3 +104,24 @@ async def get_bubble_map_screenshot(chain: str, contract_address: str):
         )
         await browser.close()
     return screenshot_location
+
+
+token = {
+    "contract_address": "F28UWka8PSyG1jUtVZ2CfFdF1dkLEA4rw7GkFBW7pump",
+    "chain": "sol",
+}
+
+
+async def main():
+    metrics = await get_decentralization_score(**token)
+    token_data = await get_token_data(**token)
+    print(
+        render_html_template(
+            "../static/token.html",
+            token=token_data.model_dump(),
+            metrics=metrics.model_dump(),
+        )
+    )
+
+
+asyncio.run(main())

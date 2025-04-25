@@ -56,6 +56,7 @@ RUN apt-get remove --purge -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /GitHub/bubble_bot
-RUN --mount=type=cache,target=/cache/uv pip install --upgrade uv && uv sync
+RUN --mount=type=cache,target=/cache/uv pip install --upgrade uv 
+RUN uv sync
 WORKDIR /GitHub/bubble_bot/src
 CMD ["uv", "run", "utils.py"]
