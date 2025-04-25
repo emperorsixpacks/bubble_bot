@@ -1,4 +1,5 @@
 import asyncio
+from io import BytesIO
 from urllib.parse import urlencode
 
 from playwright.async_api import async_playwright
@@ -85,43 +86,69 @@ async def get_token_data(*, contract_address: str, chain: str):
     )
 
 
-async def get_bubble_map_screenshot(chain: str, contract_address: str):
-    screenshot_location = f"{chain}-{contract_address}.png"
+async def get_bubble_map_screenshot(chain: str, contract_address: str) -> bytes:
+    """Generate a high-resolution 4K screenshot of the bubble map and return as bytes"""
     async with async_playwright() as p:
+        # Launch browser with higher default viewport for better quality
         browser = await p.chromium.launch(channel="chromium", headless=True)
-        page = await browser.new_page()
-        await page.goto(
-            f"https://app.bubblemaps.io/{chain}/token/{contract_address}?mode=0"
+        context = await browser.new_context(
+            viewport={
+                "width": 3840,  # 4K width
+                "height": 2160,  # 4K height
+                "deviceScaleFactor": 2,  # Higher pixel density
+            }
         )
-        await asyncio.sleep(5)
-        await page.evaluate(
-            "document.querySelectorAll('{0}').forEach(el => el.remove());".format(
-                ",".join(ELEMENTS_TO_REMOVE)
+        page = await context.new_page()
+
+        try:
+            # Navigate to the page
+            await page.goto(
+                f"https://app.bubblemaps.io/{chain}/token/{contract_address}?mode=0",
+                timeout=60000,  # Longer timeout for high-res loading
+            )
+
+            # Wait for the graph to load (adjust selector as needed)
+            await page.wait_for_selector(".graph-view", state="visible", timeout=30000)
+            await asyncio.sleep(5)  # Additional buffer time
+
+            # Remove unwanted elements
+            await page.evaluate(
+                "document.querySelectorAll('{0}').forEach(el => el.remove());".format(
+                    ",".join(ELEMENTS_TO_REMOVE)
+                )
+            )
+
+            # Take screenshot of the graph element at high quality
+            screenshot_bytes = await page.locator(".graph-view").screenshot(
+                type="png",
+                quality=100,  # Maximum quality for PNG (though PNG is lossless)
+                omit_background=True,  # Transparent background if needed
+                scale="css",  # Use CSS pixels for consistent sizing
+            )
+
+            return BytesIO(screenshot_bytes)
+
+        finally:
+            # Ensure browser is closed even if errors occur
+            await context.close()
+            await browser.close()
+
+
+if __name__ == "__main__":
+    token = {
+        "contract_address": "F28UWka8PSyG1jUtVZ2CfFdF1dkLEA4rw7GkFBW7pump",
+        "chain": "sol",
+    }
+
+    async def main():
+        metrics = await get_decentralization_score(**token)
+        token_data = await get_token_data(**token)
+        print(
+            render_html_template(
+                "../static/token.html",
+                token=token_data.model_dump(),
+                metrics=metrics.model_dump(),
             )
         )
-        await page.locator(".graph-view").screenshot(
-            path=f"../screenshots/{screenshot_location}"
-        )
-        await browser.close()
-    return screenshot_location
 
-
-token = {
-    "contract_address": "F28UWka8PSyG1jUtVZ2CfFdF1dkLEA4rw7GkFBW7pump",
-    "chain": "sol",
-}
-
-
-async def main():
-    metrics = await get_decentralization_score(**token)
-    token_data = await get_token_data(**token)
-    print(
-        render_html_template(
-            "../static/token.html",
-            token=token_data.model_dump(),
-            metrics=metrics.model_dump(),
-        )
-    )
-
-
-asyncio.run(main())
+    # asyncio.run(main())
