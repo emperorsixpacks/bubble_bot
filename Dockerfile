@@ -56,7 +56,8 @@ RUN apt-get remove --purge -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /GitHub/bubble_bot
-RUN --mount=type=cache,target=/cache/uv pip install --upgrade uv 
-RUN uv sync
+FROM system-deps as uv 
+RUN --mount=type=cache,target=/var/cache/uv pip install --upgrade uv && uv sync
+RUN --mount=type=cache,target=/var/cache/uv uv run playwright chromium 
 WORKDIR /GitHub/bubble_bot/src
-CMD ["uv", "run", "utils.py"]
+CMD ["uv", "run", "bot.py"]
