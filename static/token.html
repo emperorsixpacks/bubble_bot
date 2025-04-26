@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{token.name}} Information</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
   <style>
     .token-card {
       width: 400px;
@@ -38,85 +38,91 @@
     </div>
 
     <!-- Bubble Map Section -->
-    <div class="bubble-map w-full bg-gradient-to-b from-blue-50 to-purple-50 p-4 mb-2">
-      <img src="{{token.bubble_screenshot_url}}">
-    </div>
-
-    <!-- Metrics Grid -->
-    <div class="p-6 flex-1 flex flex-col">
-      <div class="grid grid-cols-2 gap-6 mb-4">
-        <!-- Market Data -->
-        <div class="space-y-3">
-          <h2 class="text-lg font-semibold text-gray-800 border-b pb-1">Market Data</h2>
-          <div>
-            <p class="text-sm text-gray-500">Price</p>
-            <p class="text-xl font-bold text-gray-900">${{token.price}}</p>
-          </div>
-          <div>
-            <p class="text-sm text-gray-500">Market Cap</p>
-            <p class="text-xl font-bold text-gray-900">${{token.market_cap}}</p>
-          </div>
-          <div>
-            <p class="text-sm text-gray-500">Volume (24h)</p>
-            <p class="text-xl font-bold text-gray-900">${{token.volume}}</p>
-          </div>
-        </div>
-
-        <!-- Supply Data -->
-        <div class="space-y-3">
-          <h2 class="text-lg font-semibold text-gray-800 border-b pb-1">Supply</h2>
-          <div>
-            <p class="text-sm text-gray-500">Total Supply</p>
-            <p class="text-xl font-bold text-gray-900">{{ "{:,.0f}".format(token.total_supply) }}</p>
-          </div>
-          <div>
-            <p class="text-sm text-gray-500">Circulating</p>
-            <p class="text-xl font-bold text-gray-900">{{ "{:,.0f}".format(token.circulating_supply) }}</p>
-          </div>
+    <div class="p-2">
+      <div class="rounded-xl border bg-white overflow-hidden shadow-md">
+        <div class="p-2 bg-gray-50 ">
+          <img src="{{token.bubble_screenshot_url}}" alt="Bubble Map"
+            class="object-contain h-full w-full rounded-xl border ">
         </div>
       </div>
+      <!-- Metrics Grid -->
+      <div class="p-6 flex-1 flex flex-col">
+        <div class="grid grid-cols-2 gap-6 mb-4">
+          <!-- Market Data -->
+          <div class="space-y-3">
+            <h2 class="text-lg font-semibold text-gray-800 border-b pb-1">Market Data</h2>
+            <div>
+              <p class="text-sm text-gray-500">Price</p>
+              <p class="text-xl font-bold text-gray-900">${{token.price}}</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Market Cap</p>
+              <p class="text-xl font-bold text-gray-900">${{token.market_cap}}</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Volume (24h)</p>
+              <p class="text-xl font-bold text-gray-900">${{token.volume}}</p>
+            </div>
+          </div>
 
-      <!-- Supply Distribution Bars -->
-      <div class="mt-auto">
-        <h3 class="text-sm font-semibold text-gray-500 mb-2">Supply Distribution</h3>
-        <div class="space-y-2">
-          <div>
-            <div class="flex justify-between text-xs mb-1">
-              <span class="text-gray-600">Exchanges</span>
-              <span class="font-medium text-gray-700">{{ "%.1f"|format(metrics.identified_supply.percent_in_cexs * 100) }}%</span>
+          <!-- Supply Data -->
+          <div class="space-y-3">
+            <h2 class="text-lg font-semibold text-gray-800 border-b pb-1">Supply</h2>
+            <div>
+              <p class="text-sm text-gray-500">Total Supply</p>
+              <p class="text-xl font-bold text-gray-900">{{ "{:,.0f}".format(token.total_supply) }}</p>
             </div>
-            <div class="w-full bg-gray-200 rounded-full supply-bar">
-              <div class="bg-blue-500 rounded-full supply-bar"
-                style="width: {{ metrics.identified_supply.percent_in_cexs * 100 }}%"></div>
+            <div>
+              <p class="text-sm text-gray-500">Circulating</p>
+              <p class="text-xl font-bold text-gray-900">{{ "{:,.0f}".format(token.circulating_supply) }}</p>
             </div>
           </div>
-          <div>
-            <div class="flex justify-between text-xs mb-1">
-              <span class="text-gray-600">Contracts</span>
-              <span class="font-medium text-gray-700">{{ "%.1f"|format(metrics.identified_supply.percent_in_contracts * 100) }}%</span>
+        </div>
+
+        <!-- Supply Distribution Bars -->
+        <div class="mt-auto">
+          <h3 class="text-sm font-semibold text-gray-500 mb-2">Supply Distribution</h3>
+          <div class="space-y-2">
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-gray-600">Exchanges</span>
+                <span class="font-medium text-gray-700">{{ "%.1f"|format(metrics.identified_supply.percent_in_cexs *
+                  100) }}%</span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full supply-bar">
+                <div class="bg-blue-500 rounded-full supply-bar"
+                  style="width: {{ metrics.identified_supply.percent_in_cexs * 100 }}%"></div>
+              </div>
             </div>
-            <div class="w-full bg-gray-200 rounded-full supply-bar">
-              <div class="bg-purple-500 rounded-full supply-bar"
-                style="width: {{ metrics.identified_supply.percent_in_contracts * 100 }}%"></div>
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-gray-600">Contracts</span>
+                <span class="font-medium text-gray-700">{{ "%.1f"|format(metrics.identified_supply.percent_in_contracts
+                  * 100) }}%</span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full supply-bar">
+                <div class="bg-purple-500 rounded-full supply-bar"
+                  style="width: {{ metrics.identified_supply.percent_in_contracts * 100 }}%"></div>
+              </div>
             </div>
-          </div>
-          <div>
-            <div class="flex justify-between text-xs mb-1">
-              <span class="text-gray-600">Circulating</span>
-              <span class="font-medium text-gray-700">
-                {{ "%.1f"|format((1 - metrics.identified_supply.percent_in_cexs - metrics.identified_supply.percent_in_contracts) * 100) }}%
-              </span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full supply-bar">
-              <div class="bg-green-500 rounded-full supply-bar"
-                style="width: {{ (1 - metrics.identified_supply.percent_in_cexs - metrics.identified_supply.percent_in_contracts) * 100 }}%">
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-gray-600">Circulating</span>
+                <span class="font-medium text-gray-700">
+                  {{ "%.1f"|format((1 - metrics.identified_supply.percent_in_cexs -
+                  metrics.identified_supply.percent_in_contracts) * 100) }}%
+                </span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full supply-bar">
+                <div class="bg-green-500 rounded-full supply-bar"
+                  style="width: {{ (1 - metrics.identified_supply.percent_in_cexs - metrics.identified_supply.percent_in_contracts) * 100 }}%">
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 </body>
 
 </html>
