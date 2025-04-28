@@ -1,7 +1,12 @@
 from datetime import datetime
 from typing import Optional
 
+from aiogram.fsm.state import State, StatesGroup
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
+
+
+class TokenSelection(StatesGroup):
+    waiting_for_selection = State()
 
 
 class Error(Exception):
@@ -69,3 +74,9 @@ class TokenCoinData(Base):
     @field_serializer("market_cap", "volume")
     def format_large_numbers(self, value: int, _info):
         return f"{value:,}"  # Adds commas to large numbers
+
+
+class TelegramCommand(Base):
+    token_metrics: TokenMetrics
+    token_data: TokenCoinData
+    screenshot_url: str
