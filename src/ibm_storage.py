@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 from io import BytesIO
 from typing import TYPE_CHECKING, BinaryIO, Optional, Tuple, Union
@@ -8,11 +7,12 @@ from typing import TYPE_CHECKING, BinaryIO, Optional, Tuple, Union
 import ibm_boto3
 from ibm_botocore.client import ClientError, Config
 
+# Set up logger
+from logger import get_logger
 from service_types import Error, error
 
-# Set up logger
-logger = logging.getLogger(__name__)
-
+# Set up logging
+logger = get_logger()
 if TYPE_CHECKING:
     from ibm_boto3.resources.factory.s3 import ServiceResource
     from sliderblend.pkg import IBMSettings
@@ -55,7 +55,6 @@ class IBMStorage:
         folder_path: Optional[str] = None,
     ) -> Tuple[Optional[str], error]:
         bucket_name = self.credentials.ibm_bucket_name
-        logger.debug("Listing objects in bucket: %s", bucket_name)
 
         if folder_path:
             folder_path = folder_path.strip("/")
@@ -74,10 +73,15 @@ class IBMStorage:
             else:
                 logger.debug("Uploading file from bytes/BinaryIO")
                 file_obj = BytesIO(file_data)
-                self._client.upload_fileobj(file_obj, bucket_name, full_object_name)
+                self._client.upload_fileobj(
+                    file_obj,
+                    bucket_name,
+                    full_object_name,
+                )
 
             logger.info("Upload successful: %s", full_object_name)
-            return full_object_name, None
+            object_location = f"https://{self.credentials.ibm_bucket_name}.{self.credentials.ibm_service_endpoint.removeprefix('https://')}/{full_object_name}"
+            return object_location, None
         except Exception as e:
             logger.error("Upload failed: %s", e)
             return None, Error(f"Error uploading file to IBM COS: {e}")
