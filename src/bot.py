@@ -1,18 +1,19 @@
 import asyncio
+import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from services import (
-    get_bubble_map_screenshot,
-    get_decentralization_score,
-    get_token_bubble_map,
-    get_token_data,
-    save_html_as_screenshot,
-)
+from handlers import token_router
+from service_types import TokenSelection
 from settings import TelegramSettings
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 telegram_settings = TelegramSettings()
 
 dp = Dispatcher()
@@ -30,6 +31,7 @@ async def help_handler(message: Message) -> None:
 
 async def main() -> None:
     bot = Bot(token=telegram_settings.telegram_bot_token)
+    dp.include_router(token_router)
     await dp.start_polling(bot)
 
 
