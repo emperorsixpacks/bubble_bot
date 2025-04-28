@@ -2,7 +2,7 @@ import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from src.utils import return_base_dir
+from utils import return_base_dir
 
 env_dir = os.path.join(return_base_dir(), ".env")
 
