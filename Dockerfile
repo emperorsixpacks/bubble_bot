@@ -1,63 +1,57 @@
 # syntax=docker/dockerfile:1.4
-
-# Set the python version as a build-time argument
 ARG PYTHON_VERSION=3.13-slim-bullseye
 FROM python:${PYTHON_VERSION} as base
+ENV DOCKER_BUILDKIT=1
 
-# Stage 1: Install system dependencies with caching
+# Stage 1: Install minimal system dependencies for Chromium
 FROM base as system-deps
 RUN --mount=type=cache,target=/var/cache/apt \
     apt-get update && apt-get install -y \
     wget \
-    # Required for wkhtmltoimage
-    xfonts-75dpi \
-    xfonts-base \
-    gvfs \
-    colord \
-    glew-utils \
-    libvisual-0.4-plugins \
-    gstreamer1.0-tools \
-    opus-tools \
-    qt5-image-formats-plugins \
-    qtwayland5 \
-    qt5-qmltooling-plugins \
-    librsvg2-bin \
-    lm-sensors \
+    libglib2.0-0 \
+    libnss3 \
+    libgdk-pixbuf2.0-0 \
+    libxcomposite1 \
+    libxrandr2 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libxss1 \
+    fonts-liberation \
+    libasound2 \
+    libxdamage1 \
+    libxtst6 \
+    libx11-xcb1 \
+    libcups2 \
+    libdbus-1-3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Stage 2: Install wkhtmltox with caching
-FROM system-deps as wkhtml
-RUN --mount=type=cache,target=/var/cache/apt \
-    wget -q https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.bullseye_amd64.deb \
-    && dpkg -i wkhtmltox_0.12.6.1-2.bullseye_amd64.deb \
-    && rm wkhtmltox_0.12.6.1-2.bullseye_amd64.deb
-
-# Stage 3: Install Python environment
-FROM wkhtml as python-env
+# Stage 2: Install Playwright and Chromium
+FROM system-deps as playwright
 WORKDIR /GitHub/bubble_bot
-
-# Set Python-related environment variables
+COPY pyproject.toml uv.lock ./
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    UV_CACHE_DIR=/cache/uv
+    UV_CACHE_DIR=/var/cache/uv
 
-# Copy only requirements first for better caching
+# Install uv to manage Playwright installation
+RUN --mount=type=cache,target=${UV_CACHE_DIR} \
+    pip install --upgrade uv
 
-# Install uv and dependencies with cache
+# Install Playwright and Chromium
+RUN --mount=type=cache,target=/root/.cache/playwright \
+    uv add playwright && \
+    uv run playwright install-deps && \
+    uv run playwright install chromium
 
-# Stage 4: Final image with application code
-FROM python-env as runtime
+# Stage 3: Sync project Python dependencies
+FROM playwright as build
+RUN --mount=type=cache,target=${UV_CACHE_DIR} \
+    uv sync
+
+# Stage 4: Final runtime image
+FROM build as runtime
 COPY . .
-
-# Clean up
-RUN apt-get remove --purge -y \
-    && apt-get autoremove -y \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /GitHub/bubble_bot
-FROM system-deps as uv 
-RUN --mount=type=cache,target=/var/cache/uv pip install --upgrade uv && uv sync
-RUN --mount=type=cache,target=/var/cache/uv uv run playwright install chromium 
+#RUN rm -rf .venv  
 WORKDIR /GitHub/bubble_bot/src
 CMD ["uv", "run", "bot.py"]
+

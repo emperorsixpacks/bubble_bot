@@ -5,12 +5,16 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "aiogram>=3.20.0.post0",
     "httpx>=0.28.1",
+    "ibm-cos-sdk>=2.14.0",
     "imgkit>=1.2.3",
     "jinja2>=3.1.6",
     "networkx>=3.4.2",
     "pandas>=2.2.3",
+    "pillow>=11.2.1",
     "playwright>=1.51.0",
     "plotly>=6.0.1",
     "pydantic>=2.11.3",
+    "pydantic-settings>=2.9.1",
 ]
