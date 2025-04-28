@@ -10,6 +10,7 @@ import imgkit
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image
 
+from enum import StrEnum
 from logger import get_logger
 
 # Set up logging
@@ -18,6 +19,24 @@ logger = get_logger()
 if TYPE_CHECKING:
     from ibm_storage import IBMStorage
     from service_types import TokenCoinData, TokenMetrics
+
+
+class Chain(StrEnum):
+    ETH = "eth"
+    BSC = "bsc"
+    FTM = "ftm"
+    AVAX = "avax"
+    CRO = "cro"
+    ARBI = "arbi"
+    POLY = "poly"
+    BASE = "base"
+    SOL = "sol"
+    SONIC = "sonic"
+
+    # Optional: Add helper methods
+    @classmethod
+    def is_evm(cls, chain: "Chain") -> bool:
+        return chain not in {cls.SOL, cls.SONIC}  # Adjust based on your logic
 
 
 def return_base_dir():
