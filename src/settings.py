@@ -17,6 +17,10 @@ class TelegramSettings(AppSettings):
     telegram_bot_token: str
 
 
+class CoinGeckoAPISettings(AppSettings):
+    coin_gecko_api_key: str
+
+
 class IBMSettings(AppSettings):
     ibm_service_endpoint: str
     ibm_bucket_name: str
