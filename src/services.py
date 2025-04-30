@@ -1,22 +1,28 @@
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
+import numpy as np
+from httpx import AsyncClient
 from playwright.async_api import async_playwright
 
 from logger import get_logger
-from service_types import (
-    TelegramCommand,
-    TokenCoinData,
-    TokenCommunityData,
-    TokenMetrics,
-)
-from utils import reduce_image_size, render_html_template, return_base_dir, send_request
+from service_types import (CoinGeckoSearch, Error, TelegramCommand,
+                           TokenCoinData, TokenCommunityData, TokenMetrics,
+                           error)
+from utils import (AsyncRequestSession, CoinGeckoRateLimiter,
+                   reduce_image_size, render_html_template, return_base_dir,
+                   send_request)
+
+if TYPE_CHECKING:
+    from settings import CoinGeckoAPISettings
 
 # Set up logging
 logger = get_logger()
 
+COIN_GECKO_RATE_LIMITER = CoinGeckoRateLimiter()
 
 BUBBLE_MAPS_API_URL = "https://api-legacy.bubblemaps.io"
 ELEMENTS_TO_REMOVE = [
@@ -27,6 +33,10 @@ ELEMENTS_TO_REMOVE = [
 ]
 TOKEN_TEMPLATE_PATH = "../static/token.html"
 BUBBLE_MAP_TEMPLATE = "../static/bubble_map.html"
+COINGECKO_SEARCH_API_URL = (
+    "https://api.coingecko.com/api/v3/search?query={token_symbol}"
+)
+COINGECKO_GET_TOKEN_URL = "https://api.coingecko.com/api/v3/coins/{token_id}"
 
 
 async def bubble_map(path: str, *, contract_address: str, chain: str) -> dict[str, any]:
@@ -235,6 +245,86 @@ async def get_page_screenshot(
         raise
 
 
+async def process_batch(
+    session: AsyncClient, batch: list[CoinGeckoSearch], chain: str
+) -> list[CoinGeckoSearch]:
+    batch_results = []
+    MAX_RETRIES = 2
+
+    async def fetch_token(
+        token: CoinGeckoSearch,
+    ) -> tuple[CoinGeckoSearch | None, error]:
+        for attempt in range(MAX_RETRIES + 1):
+            await COIN_GECKO_RATE_LIMITER.acquire()
+            url = COINGECKO_GET_TOKEN_URL.format(token_id=token.coin_gecko_id)
+            res = await session.get(url)
+            if res.status_code == 429:
+                wait = int(res.headers.get("Retry-After", 10))
+                await asyncio.sleep(wait)
+                continue
+            if res.status_code != 200:
+                return None, Error(res.content)
+            data = res.json()
+            contract_address = data.get("platforms", None).get(chain, None)
+            if contract_address is None:
+                return None, Error("Contract address not found")
+            token.chain = chain
+            token.contract_address = contract_address
+            return token, None
+        if attempt == MAX_RETRIES:
+            return None, Error(f"Failed after {MAX_RETRIES} retries: {attempt}")
+        await asyncio.sleep(2**attempt)
+
+    tasks = [fetch_token(token) for token in batch]
+    results = await asyncio.gather(*tasks)
+
+    # Separate results and errors
+    for token, err in results:
+        if err:
+            logger.error("Error: %s", err.message)
+            continue
+        batch_results.append(token)
+
+    return batch_results
+
+
+async def filter_by_chain(session, *, data: list[CoinGeckoSearch], chain: str) -> tuple(
+    CoinGeckoSearch | None, error
+):
+    BATCH_SIZE = 5
+    all_results = []
+    for i in range(0, len(data), BATCH_SIZE):
+        batch = data[i : i + BATCH_SIZE]
+        results = await process_batch(session, batch, chain)
+        all_results.append(results)
+    return all_results
+
+
+async def search_token(
+    coin_gecko_api: CoinGeckoAPISettings, *, symbol: str, chain: str
+) -> tuple(list[CoinGeckoSearch], error):
+    async with AsyncRequestSession() as session:
+        url = COINGECKO_SEARCH_API_URL.format(token_symbol=symbol)
+        response = await session.get(url)
+        if response.status_code != 200:
+            return None, Error(response.content)
+        data = response.json()
+        coins_array = np.array(
+            [(coin["id"], coin["symbol"], coin["name"]) for coin in data["coins"]]
+        )
+
+        mask = np.char.lower(coins_array[:, 1]) == symbol.lower()
+        filtered_coins = coins_array[mask]
+
+        result = [
+            CoinGeckoSearch(
+                coin_gecko_id=str(coin[0]), symbol=str(coin[1]), name=str(coin[2])
+            )
+            for coin in filtered_coins
+        ]
+        return await filter_by_chain(session, data=result, chain=chain)
+
+
 async def run(contract_address: str, chain: str, ibm_storage: IBMStorage):
     logger.info(f"Starting bubble map generation for {chain}/{contract_address}")
     try:
@@ -310,7 +400,11 @@ async def run(contract_address: str, chain: str, ibm_storage: IBMStorage):
         logger.info(
             f"Successfully completed bubble map processing for {chain}/{contract_address}"
         )
-        return TelegramCommand(token_data, token_metrics, token_page_screenshot_url)
+        return TelegramCommand(
+            token_data=token_data,
+            token_metrics=token_metrics,
+            screenshot_url=token_page_screenshot_url,
+        )
 
     except Exception as e:
         logger.error(f"Error during bubble map generation: {str(e)}")
@@ -319,9 +413,10 @@ async def run(contract_address: str, chain: str, ibm_storage: IBMStorage):
 
 if __name__ == "__main__":
     from ibm_storage import IBMStorage
-    from settings import IBMSettings
+    from settings import CoinGeckoAPISettings, IBMSettings
 
     settings = IBMSettings()
+    coinSettings = CoinGeckoAPISettings()
     ibm_storage = IBMStorage(settings)
     token = {
         "contract_address": "F28UWka8PSyG1jUtVZ2CfFdF1dkLEA4rw7GkFBW7pump",
@@ -330,3 +425,5 @@ if __name__ == "__main__":
     }
 
     # asyncio.run(run(**token))
+    # print(asyncio.run(search_token("usdt", "eth")))
+    asyncio.run(search_token(coinSettings, symbol="usdt", chain="solana"))
