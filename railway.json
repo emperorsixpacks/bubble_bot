@@ -1,12 +1,6 @@
 {
     "build": {
       "builder": "DOCKERFILE",
-        "dockerfilePath": "./Dockerfile",
-        "watchPatterns": [
-            "./pyproject.toml",
-            "./src/**",
-            "./railway.json",
-            "./Dockerfile"
-        ]
+        "dockerfilePath": "./Dockerfile"
     }
 }
