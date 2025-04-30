@@ -1,4 +1,5 @@
 import re
+from warnings import resetwarnings
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -9,57 +10,117 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InputFile,
     Message,
-    message,
 )
 
 from ibm_storage import IBMStorage
-from service_types import TokenSelection
+from logger import get_logger
+from service_types import Chain, Error, TokenSelection, error
 from services import run
 from settings import IBMSettings
-from logger import get_logger
-from utils import generate_token_description_text
+from utils import generate_token_description_text, to_chain
 
 temp_token_data = {}
 ibm_settings = IBMSettings()
 ibm_storage = IBMStorage(ibm_settings)
 token_router = Router(name=__name__)
+logger = get_logger()
 
 
-async def process_and_reply(message: Message, contract_address: str, chain: str):
+async def process_and_reply(
+    message: Message, contract_address: str, chain: str
+) -> error:
     """Helper function to process and send reply"""
     try:
-        token_data, token_metrics, image_path = await run(
+        response = await run(
             contract_address=contract_address, chain=chain, ibm_storage=ibm_storage
         )
-        response_text = generate_token_description_text(token_data, token_metrics)
-        with open(image_path, "rb") as photo:
-            await message.reply_photo(
-                photo=InputFile(photo), caption=response_text, parse_mode="Markdown"
-            )
+        response_text = generate_token_description_text(
+            response.token_data, response.token_metrics
+        )
+
+        # photo, err = await image_from_url(response.screenshot_url)
+        # if err:
+        #   logger.error(err.message)
+        #  return err
+        send_photo_message = await message.reply_photo(
+            photo=response.screenshot_url, caption=f"{contract_address}/{chain}"
+        )
+        await send_photo_message.reply(
+            text=response_text,
+            parse_mode="Markdown",
+        )
+        return
     except Exception as e:
-        await message.reply(f"❌ Error processing your request: {str(e)}")
+        return Error(str(e))
 
 
-"""
-async def handle_token_input(message: Message, state: FSMContext):
-    # Check if message matches $token_symbol/chain pattern
-    pattern = r"^\$([a-zA-Z0-9]+)/([a-zA-Z]+)$"
-    match = re.match(pattern, message.text)
+@token_router.message(Command("bi"))
+async def bm_command_handler(message: Message):
+    contract_address_chain_pattern = (
+        r"^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})/([a-zA-Z]+)$"
+    )
+    token_chain_pattern = r"^\$([a-zA-Z0-9]+)/([a-zA-Z]+)$"
 
-    if not match:
+    _, token = message.text.split(" ")
+
+    if match := re.match(token_chain_pattern, token.strip()):
+        token, chain = match.groups()
+        chain, err = to_chain(chain)
+        if err:
+            await message.reply(
+                f"""
+                {chain} is not a valid chain, chain must be {[chain.value for chain in Chain]}
+                """
+            )
+            return
+
+        err = await handle_token_name(message, token, chain)
+    elif match := re.match(contract_address_chain_pattern, token.strip()):
+        token, chain = match.groups()
+        chain, err = to_chain(chain)
+        if err:
+            await message.reply(
+                f"""
+                {chain} is not a valid chain, chain must be {[chain.value for chain in Chain]}
+                """
+            )
+            return
+
+        err = await handle_contract_address(message, token, chain)
+
+    else:
         await message.reply(
-            "Please use format: $token_symbol/chain\nExample: $usdt/eth"
+            """
+            Please send contract address in format: contract_address/chain\nExample: 0x123...abc/eth, $usdt/eth
+            """
         )
         return
 
-    symbol, chain = match.groups()
+    if err:
+        logger.error(err.message)
+        await message.reply(f"oops!! something went wrong {token}/{chain}")
+        return
+    return
+
+
+async def handle_contract_address(message: Message, contract_address, chain) -> error:
+    response_message = await message.reply(
+        f"Getting info for {contract_address} on {chain.upper()}"
+    )
+    err = await process_and_reply(message, contract_address, chain)
+    await response_message.delete()
+    return err
+
+
+async def handle_token_name(message: Message, state: FSMContext, token, chain):
+    # Check if message matches $token_symbol/chain pattern
 
     # Fetch token options from API
     token_options = await fetch_token_options(symbol, chain)
 
     if not token_options:
         await message.reply(
-            f"❌ No tokens found for ${symbol} on {chain.upper()} chain"
+            f"❌ No tokens found for ${token} on {chain.upper()} chain"
         )
         return
 
@@ -90,8 +151,6 @@ async def handle_token_input(message: Message, state: FSMContext):
             reply_markup=keyboard,
         )
         await TokenSelection.waiting_for_selection.set()
-
-"""
 
 
 async def handle_token_selection(callback_query: CallbackQuery, state: FSMContext):
@@ -127,24 +186,3 @@ async def handle_token_selection(callback_query: CallbackQuery, state: FSMContex
     # Clean up
     del temp_token_data[user_id]
     await state.finish()
-
-
-@token_router.message(Command("bm"))
-async def handle_contract_address(message: Message):
-    """Original handler for contract addresses (unchanged)"""
-    pattern = r"^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})/([a-zA-Z0-9-]+)$"
-
-    _, text = message.text.split(" ")
-
-    match = re.match(pattern, text.strip())
-
-    if not match:
-        await message.reply(
-            """
-            Please send contract address in format: contract_address/chain\nExample: 0x123...abc/eth
-            """
-        )
-        return
-
-    contract_address, chain = match.groups()
-    await process_and_reply(message, contract_address, chain)
