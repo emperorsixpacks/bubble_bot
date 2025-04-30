@@ -144,35 +144,7 @@
                     labelThreshold: 30,
                 };
 
-                let currentZoom = d3.zoomIdentity.scale(config.defaultZoomScale);
-                const zoom = d3.zoom()
-                    .scaleExtent([0.3, 5])
-                    .on("zoom", (event) => {
-                        currentZoom = event.transform;
-                        svg.selectAll(".nodes").attr("transform", currentZoom);
-                        svg.selectAll(".links").attr("transform", currentZoom);
-                    });
-
-                svg.call(zoom).call(zoom.transform, currentZoom);
-
-                // Add button event handlers
-                d3.select("#zoom-in").on("click", () => {
-                    currentZoom = currentZoom.scale(1.2);
-                    svg.transition().duration(200).call(zoom.transform, currentZoom);
-                });
-
-                d3.select("#zoom-out").on("click", () => {
-                    currentZoom = currentZoom.scale(0.8);
-                    svg.transition().duration(200).call(zoom.transform, currentZoom);
-                });
-
-                d3.select("#reset-zoom").on("click", () => {
-                    currentZoom = d3.zoomIdentity
-                        .translate(width / 2, height / 2)
-                        .scale(config.defaultZoomScale);
-                    svg.transition().duration(300).call(zoom.transform, currentZoom);
-                });
-                // Process raw data into visualization format
+               // Process raw data into visualization format
                 function processData(rawData, config) {
                     // Create node map by index
                     const nodeMap = {};
@@ -465,6 +437,26 @@
                             .translate(width / 2, height / 2)
                             .scale(config.defaultZoomScale),
                     );
+                    let currentZoom = d3.zoomIdentity.scale(defaultConfig.defaultZoomScale);
+                    svg.call(zoom).call(zoom.transform, currentZoom);
+
+                    // Add button event handlers
+                    d3.select("#zoom-in").on("click", () => {
+                        currentZoom = currentZoom.scale(1.2);
+                        svg.transition().duration(200).call(zoom.transform, currentZoom);
+                    });
+
+                    d3.select("#zoom-out").on("click", () => {
+                        currentZoom = currentZoom.scale(0.8);
+                        svg.transition().duration(200).call(zoom.transform, currentZoom);
+                    });
+
+                    d3.select("#reset-zoom").on("click", () => {
+                        currentZoom = d3.zoomIdentity
+                            .translate(width / 2, height / 2)
+                            .scale(config.defaultZoomScale);
+                        svg.transition().duration(300).call(zoom.transform, currentZoom);
+                    });
 
                     // Drag functions
                     function dragstarted(event, d) {
@@ -508,7 +500,7 @@
                         const scale = Math.min(
                             (width - 2 * padding) / graphWidth,
                             (height - 2 * padding) / graphHeight,
-                            config.defaultZoomScale,
+                            defaultConfig.defaultZoomScale,
                         );
 
                         const translateX =
