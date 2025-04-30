@@ -40,7 +40,7 @@ All using **Python** and **Aiogram**!
 
 2. Install dependencies:
    ```bash
-   pip install %% uv sync
+   pip install && uv sync
    ```
 
 3. Create a `.env` file with:
