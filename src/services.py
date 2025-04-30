@@ -34,7 +34,7 @@ ELEMENTS_TO_REMOVE = [
 TOKEN_TEMPLATE_PATH = "../static/token.html"
 BUBBLE_MAP_TEMPLATE = "../static/bubble_map.html"
 COINGECKO_SEARCH_API_URL = (
-    "https://pro-api.coingecko.com/api/v3/search?query={token_symbol}"
+    "https://api.coingecko.com/api/v3/search?query={token_symbol}"
 )
 COINGECKO_GET_TOKEN_URL = "https://api.coingecko.com/api/v3/coins/{token_id}"
 
@@ -312,7 +312,7 @@ async def search_token(
         url = COINGECKO_SEARCH_API_URL.format(token_symbol=symbol)
         response = await session.get(url)
         if response.status_code != 200:
-            return None, Error(response.content)
+            return None, Error(f"Error: {response.content}")
         data = response.json()
         coins_array = np.array(
             [(coin["id"], coin["symbol"], coin["name"]) for coin in data["coins"]]
@@ -431,4 +431,4 @@ if __name__ == "__main__":
 
     # asyncio.run(run(**token))
     # print(asyncio.run(search_token("usdt", "eth")))
-    asyncio.run(search_token(coinSettings, symbol="usdt", chain="solana"))
+    print(asyncio.run(search_token(coinSettings, symbol="usdt", chain="solana")))
