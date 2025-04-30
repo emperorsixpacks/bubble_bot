@@ -21,7 +21,13 @@ dp = Dispatcher()
 
 @dp.message(Command("start"))
 async def start_handler(message: Message) -> None:
-    await message.answer("🚀 Welcome to the Bubble Bot!\n\n")
+    await message.answer(
+        "🚀 Welcome to the Bubble Check!\n\n"
+        "Here are the available commands:\n"
+        "/help - See commands\n"
+        "/bm - Get top traders bubble map\n"
+        "/bi - Get token info with bubble map"
+    )
 
 
 @dp.message(Command("help"))
