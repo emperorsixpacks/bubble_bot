@@ -5,7 +5,7 @@ ENV DOCKER_BUILDKIT=1
 
 # Stage 1: Install minimal system dependencies for Chromium
 FROM base as system-deps
-RUN --mount=type=cache,id=s/6df28531-b778-4a87-b441-4b392717ce14-/var/cache/apt,target=/var/cache/apt \
+RUN --mount=type=cache,id=s/b0f121f6-e97e-46b6-959f-5fc9ae9105fd-/var/cache/apt,target=/var/cache/apt \
     apt-get update && apt-get install -y \
     wget \
     libglib2.0-0 \
@@ -34,18 +34,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_CACHE_DIR=/var/cache/uv
 
 # Install uv to manage Playwright installation
-RUN --mount=type=cache,id=s/6df28531-b778-4a87-b441-4b392717ce14-${UV_CACHE_DIR},target=${UV_CACHE_DIR} \
+RUN --mount=type=cache,id=s/b0f121f6-e97e-46b6-959f-5fc9ae9105fd-${UV_CACHE_DIR},target=${UV_CACHE_DIR} \
     pip install --upgrade uv
 
 # Install Playwright and Chromium
-RUN --mount=type=cache,id=s/6df28531-b778-4a87-b441-4b392717ce14-/root/.cache/playwright,target=/root/.cache/playwright \
+RUN --mount=type=cache,id=s/b0f121f6-e97e-46b6-959f-5fc9ae9105fd-/root/.cache/playwright,target=/root/.cache/playwright \
     uv add playwright && \
     uv run playwright install-deps && \
     uv run playwright install chromium
 
 # Stage 3: Sync project Python dependencies
 FROM playwright as build
-RUN --mount=type=cache,id=s/6df28531-b778-4a87-b441-4b392717ce14-${UV_CACHE_DIR},target=${UV_CACHE_DIR} \
+RUN --mount=type=cache,id=s/b0f121f6-e97e-46b6-959f-5fc9ae9105fd-${UV_CACHE_DIR},target=${UV_CACHE_DIR} \
     uv sync
 
 # Stage 4: Final runtime image
