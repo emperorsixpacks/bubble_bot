@@ -3,8 +3,8 @@ from utils import return_base_dir
 from dotenv import load_dotenv
 
 # Load the .env file manually
-env_path = os.path.join(return_base_dir(), ".env")
-load_dotenv(env_path)
+#env_path = os.path.join(return_base_dir(), ".env")
+#load_dotenv(env_path)
 
 
 class AppSettings:
