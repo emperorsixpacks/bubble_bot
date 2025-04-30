@@ -433,6 +433,6 @@ if __name__ == "__main__":
     # print(asyncio.run(search_token("usdt", "eth")))
     print(
         asyncio.run(
-            search_token(coinSettings.coin_gecko_api_key, symbol="usdt", chain="solana")
+            search_token(coinSettings.coin_gecko_api_key, symbol="abc", chain="ethereum")
         )
     )

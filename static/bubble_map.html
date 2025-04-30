@@ -1,7 +1,8 @@
+
 <!doctype html>
 <html>
     <head>
-        <title>Bubble Map</title>
+        <title>Bubble Map - Token Trader Network</title>
         <script src="https://d3js.org/d3.v7.min.js"></script>
         <style>
             body {
@@ -9,272 +10,487 @@
                 color: #fff;
                 font-family: Arial, sans-serif;
                 margin: 0;
+                padding: 20px;
             }
 
             #visualization-container {
-                width: 100%; /* Full width of the parent (or viewport if no parent constraints) */
-                height: 100%; /* Keep the height fixed, or adjust as needed */
+                width: 100%;
+                height: 800px;
                 margin: 0 auto;
-                overflow: hidden; /* Prevent scrollbars from zoom */
-                position: relative;
-            }
-
-            .node {
-                fill: #8a4af3;
-                fill-opacity: 0.8;
-                stroke: #fff;
-                stroke-width: 1;
-            }
-
-            .link {
-                stroke: #fff;
-                stroke-opacity: 1.6;
-                stroke-dasharray: 5, 5;
-            }
-
-            .arrow {
-                fill: #fff;
-                fill-opacity: 0.8; /* Added for brightness */
+                border: 1px solid #333;
+                border-radius: 8px;
+                overflow: hidden;
             }
 
             #title {
                 text-align: center;
-                margin: 10px 0;
+                margin-bottom: 15px;
+                font-size: 1.2em;
+            }
+
+            #legend {
+                display: flex;
+                justify-content: center;
+                margin: 15px 0;
+                flex-wrap: wrap;
+                gap: 15px;
+            }
+
+            .legend-item {
+                display: flex;
+                align-items: center;
+                margin: 0 10px;
+            }
+
+            .legend-color {
+                width: 20px;
+                height: 20px;
+                margin-right: 8px;
+                border-radius: 50%;
+            }
+
+            .node {
+                stroke: #fff;
+                stroke-width: 1.5;
+                cursor: pointer;
+                transition: fill-opacity 0.3s;
+            }
+
+            .node:hover {
+                stroke-width: 2.5;
+            }
+
+            .node-label {
+                font-size: 12px;
+                fill: white;
+                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+                pointer-events: none;
+            }
+
+            .link {
+                stroke-opacity: 0.6;
+            }
+
+            .tooltip {
+                position: absolute;
+                padding: 8px;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                border-radius: 4px;
+                pointer-events: none;
+                font-size: 14px;
+                max-width: 300px;
             }
         </style>
     </head>
 
     <body>
         <div id="title"></div>
+        <div id="legend"></div>
         <div id="visualization-container">
-            <svg width="100%" height="900"></svg>
+            <svg width="100%" height="100%"></svg>
         </div>
+        <div class="tooltip"></div>
+
         <script>
-            // Inject the data into a JavaScript variable
             const data = {{ chart_data | tojson | safe }};
-        </script>
-        <script>
-            // Embed the data directly into JavaScript (expanded to 10 nodes for demonstration)
-            // URL for fetching data (replace with your actual URL)
-
-            // Sample data as a fallback (in case fetch fails)
-            // Function to initialize the visualization with the data
-            function initializeVisualization(data) {
-              // Display the token info as a title
-              const title = `${data.full_name} (${data.symbol}) on ${data.chain.toUpperCase()} - Updated: ${data.dt_update}`;
-              document.getElementById("title").textContent = title;
-
-              // Prepare the data for D3.js
-              data.nodes.forEach((node) => {
-                node.id = node.address;
-              });
-
-              // Transform the links: map source and target indices to node objects
-              const links = data.links
-                .map((link) => {
-                  const sourceNode = data.nodes[link.source];
-                  const targetNode = data.nodes[link.target];
-                  if (!sourceNode || !targetNode) {
-                    console.warn("Invalid link:", link);
-                    return null;
-                  }
-                  return {
-                    source: sourceNode,
-                    target: targetNode,
-                    value: Math.max(link.forward, link.backward),
-                    forward: link.forward,
-                    backward: link.backward,
-                    direction: link.forward >= link.backward ? "forward" : "backward",
-                  };
-                })
-                .filter((link) => link !== null);
-
-              // Set up the SVG canvas
-              const svg = d3.select("svg");
-              const width = svg.node().getBoundingClientRect().width; // Get the actual pixel width
-              const height = +svg.attr("height");
-
-              // Define a scale for the radius (based on amount)
-              const radiusScale = d3
-                .scaleSqrt()
-                .domain([0, d3.max(data.nodes, (d) => d.amount)])
-                .range([10, 90]); // Reduced max radius for more nodes
-
-              // Define a scale for the line thickness (based on link value)
-              const linkScale = d3
-                .scaleLinear()
-                .domain([0, d3.max(links, (d) => d.value)])
-                .range([1, 10]); // Reduced max thickness for clarity
-
-              // Define the arrowhead marker
-              svg
-                .append("defs")
-                .append("marker")
-                .attr("id", "arrow")
-                .attr("viewBox", "0 -5 10 10")
-                .attr("refX", 15)
-                .attr("refY", 0)
-                .attr("markerWidth", 10)
-                .attr("markerHeight", 10)
-                .attr("orient", "auto")
-                .append("path")
-                .attr("d", "M0,-5L10,0L0,5")
-                .attr("class", "arrow");
-
-              // Create a force simulation with parameters for circular arrangement
-              const simulation = d3
-                .forceSimulation(data.nodes)
-                .force("link", d3.forceLink(links).distance(200)) // Short distance for tight clustering
-                .force("charge", d3.forceManyBody().strength(-100)) // Strong repulsion for circular spread
-                .force("center", d3.forceCenter(width / 2, height / 2))
-                .force(
-                  "collide",
-                  d3.forceCollide((d) => radiusScale(d.amount) + 10),
-                );
-
-              // Draw nodes (bubbles)
-              const node = svg
-                .append("g")
-                .attr("class", "nodes")
-                .selectAll("circle")
-                .data(data.nodes)
-                .enter()
-                .append("circle")
-                .attr("class", "node")
-                .attr("r", (d) => radiusScale(d.amount))
-                .call(
-                  d3
-                    .drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended),
-                );
-
-              // Draw links (lines between nodes) with arrows and variable thickness
-              const link = svg
-                .append("g")
-                .attr("class", "links")
-                .selectAll("line")
-                .data(links)
-                .enter()
-                .append("line")
-                .attr("class", "link")
-                .attr("marker-end", (d) =>
-                  d.direction === "forward" ? "url(#arrow)" : "url(#arrow)",
-                );
-
-              // Initialize node positions roughly for immediate zoom
-              data.nodes.forEach((node, i) => {
-                node.x = node.x || width / 2 + Math.cos(i) * 100;
-                node.y = node.y || height / 2 + Math.sin(i) * 100;
-              });
-
-              // Apply the default zoom immediately
-              fitGraph();
-
-              // Update positions on each tick of the simulation
-              simulation.on("tick", () => {
-                link
-                  .attr("x1", (d) => d.source.x)
-                  .attr("y1", (d) => d.source.y)
-                  .attr("x2", (d) => d.target.x)
-                  .attr("y2", (d) => d.target.y);
-
-                node.attr("cx", (d) => d.x).attr("cy", (d) => d.y);
-              });
-
-              // Drag functions
-              function dragstarted(event, d) {
-                if (!event.active) simulation.alphaTarget(0.3).restart();
-                d.fx = d.x;
-                d.fy = d.y;
-              }
-
-              function dragged(event, d) {
-                d.fx = event.x;
-                d.fy = event.y;
-              }
-
-              function dragended(event, d) {
-                if (!event.active) simulation.alphaTarget(0);
-                d.fx = null;
-                d.fy = null;
-              }
-
-              // Add zoom functionality
-              const zoom = d3
-                .zoom()
-                .extent([
-                  [0, 0],
-                  [width, height],
-                ])
-                .scaleExtent([0.3, 8]) // Allow zooming out further if needed
-                .on("zoom", zoomed);
-              svg.call(zoom);
-
-              function zoomed({ transform }) {
-                svg.selectAll(".nodes").attr("transform", transform);
-                svg.selectAll(".links").attr("transform", transform);
-              }
-
-              // Fit the graph to the view
-              // Set a default zoom-out level
-              function fitGraph() {
-                // Compute the bounding box of the nodes
-                const bounds = {
-                  xMin: Infinity,
-                  xMax: -Infinity,
-                  yMin: Infinity,
-                  yMax: -Infinity,
+            // Main visualization module
+            const BubbleMap = (function () {
+                // Default configuration
+                const defaultConfig = {
+                    topTraderCount: 10,
+                    radiusRange: [10, 90],
+                    linkDistance: 200,
+                    chargeStrength: -100,
+                    defaultZoomScale: 1.2,
+                    linkThicknessRange: [1, 3],
+                    nodeColors: {
+                        contract: "#8a4af3",
+                        wallet: "#4ac2f3",
+                        burn: "#f34a4a",
+                        exchange: "#f3c24a",
+                    },
+                    linkColors: {
+                        forward: "#4af38a",
+                        backward: "#f38a4a",
+                        bidirectional: "#a78bfa",
+                    },
+                    labelThreshold: 30,
                 };
-                data.nodes.forEach((node) => {
-                  if (node.x && node.y) {
-                    // Ensure node positions are defined
-                    bounds.xMin = Math.min(bounds.xMin, node.x);
-                    bounds.xMax = Math.max(bounds.xMax, node.x);
-                    bounds.yMin = Math.min(bounds.yMin, node.y);
-                    bounds.yMax = Math.max(bounds.yMax, node.y);
-                  }
-                });
 
-                // Add padding and compute the scale
-                const padding = 50;
-                const graphWidth = bounds.xMax - bounds.xMin;
-                const graphHeight = bounds.yMax - bounds.yMin;
-                const scaleX = (width - 2 * padding) / graphWidth;
-                const scaleY = (height - 2 * padding) / graphHeight;
-                let scale = Math.min(scaleX, scaleY, 1);
+                // Process raw data into visualization format
+                function processData(rawData, config) {
+                    // Create node map by index
+                    const nodeMap = {};
+                    rawData.nodes.forEach((node, i) => {
+                        nodeMap[i] = node;
+                        node.id = node.address;
+                    });
 
-                // Enforce a default zoom-out level (e.g., at least 50% zoom)
-                const defaultZoomScale = 1.5; // percentage
-                scale = Math.min(scale, defaultZoomScale);
+                    // Process links - only between top traders
+                    const topTraders = rawData.nodes
+                        .sort((a, b) => b.amount - a.amount)
+                        .slice(0, config.topTraderCount)
+                        .map((node) => node.id);
 
-                // Compute the translation to center the graph
-                const translateX = (width - graphWidth * scale) / 2 - bounds.xMin * scale;
-                const translateY = (height - graphHeight * scale) / 2 - bounds.yMin * scale;
+                    const links = rawData.links
+                        .map((link) => {
+                            const sourceNode = nodeMap[link.source];
+                            const targetNode = nodeMap[link.target];
 
-                // Apply the zoom transform to the correct elements
-                const transform = d3.zoomIdentity
-                  .translate(translateX, translateY)
-                  .scale(scale);
-                svg.selectAll(".nodes").attr("transform", transform);
-                svg.selectAll(".links").attr("transform", transform);
+                            if (!sourceNode || !targetNode) return null;
+                            if (
+                                !topTraders.includes(sourceNode.id) ||
+                                !topTraders.includes(targetNode.id)
+                            ) {
+                                return null;
+                            }
 
-                // Update the zoom handler to reflect this transform
-                // svg.call(zoom.transform, transform);
-              }
-              simulation.on("end", fitGraph);
+                            return {
+                                source: sourceNode,
+                                target: targetNode,
+                                value: Math.max(link.forward, link.backward),
+                                forward: link.forward,
+                                backward: link.backward,
+                                direction:
+                                    link.forward >= link.backward
+                                        ? "forward"
+                                        : "backward",
+                            };
+                        })
+                        .filter((link) => link !== null);
 
-              // Add tooltips with name and amount
-              node.on("mouseover", function (event, d) {
-                d3.select(this)
-                  .append("title")
-                  .text(`${d.name}: ${d.amount.toLocaleString()} ${data.symbol}`);
-              });
-            }
+                    return {
+                        nodes: rawData.nodes.filter((node) =>
+                            topTraders.includes(node.id),
+                        ),
+                        links: links,
+                        metadata: {
+                            tokenName: rawData.full_name,
+                            tokenSymbol: rawData.symbol,
+                            chain: rawData.chain,
+                            updateTime: rawData.dt_update,
+                        },
+                    };
+                }
 
-            // Fetch the data and initialize the visualization
-            initializeVisualization(data);
-        </script
+                // Initialize the visualization
+                function initialize(
+                    containerSelector,
+                    rawData,
+                    userConfig = {},
+                ) {
+                    const config = { ...defaultConfig, ...userConfig };
+                    const data = processData(rawData, config);
+                    const svg = d3.select(containerSelector);
+                    const tooltip = d3.select(".tooltip");
+
+                    // Set up title
+                    document.getElementById("title").textContent =
+                        `${data.metadata.tokenName} (${data.metadata.tokenSymbol}) on ${data.metadata.chain.toUpperCase()} - Updated: ${data.metadata.updateTime}`;
+
+                    // Create legend
+                    const legend = d3.select("#legend");
+
+                    // Node legend
+                    const nodeTypes = [
+                        {
+                            color: config.nodeColors.contract,
+                            label: "Contract",
+                        },
+                        { color: config.nodeColors.wallet, label: "Wallet" },
+                        {
+                            color: config.nodeColors.burn,
+                            label: "Burn Address",
+                        },
+                    ];
+
+                    nodeTypes.forEach((type) => {
+                        legend
+                            .append("div")
+                            .attr("class", "legend-item")
+                            .html(
+                                `<div class="legend-color" style="background:${type.color}"></div><span>${type.label}</span>`,
+                            );
+                    });
+
+                    // Link legend
+                    const linkTypes = [
+                        { color: config.linkColors.forward, label: "Outgoing" },
+                        {
+                            color: config.linkColors.backward,
+                            label: "Incoming",
+                        },
+                        {
+                            color: config.linkColors.bidirectional,
+                            label: "Both Directions",
+                        },
+                    ];
+
+                    linkTypes.forEach((type) => {
+                        legend
+                            .append("div")
+                            .attr("class", "legend-item")
+                            .html(
+                                `<div class="legend-color" style="background:${type.color}; border-radius:0"></div><span>${type.label}</span>`,
+                            );
+                    });
+
+                    // Set up SVG
+                    const width = svg.node().getBoundingClientRect().width;
+                    const height = svg.node().getBoundingClientRect().height;
+
+                    // Create scales
+                    const radiusScale = d3
+                        .scaleSqrt()
+                        .domain([0, d3.max(data.nodes, (d) => d.amount)])
+                        .range(config.radiusRange);
+
+                    const linkScale = d3
+                        .scaleLinear()
+                        .domain([0, d3.max(data.links, (d) => d.value)])
+                        .range(config.linkThicknessRange);
+
+                    // Create arrow markers
+                    svg.append("defs")
+                        .selectAll("marker")
+                        .data(["forward", "backward", "bidirectional"])
+                        .enter()
+                        .append("marker")
+                        .attr("id", (d) => `arrow-${d}`)
+                        .attr("viewBox", "0 -5 10 10")
+                        .attr("refX", (d) => (d === "bidirectional" ? 20 : 15))
+                        .attr("refY", 0)
+                        .attr("markerWidth", 6)
+                        .attr("markerHeight", 6)
+                        .attr("orient", "auto")
+                        .append("path")
+                        .attr("d", "M0,-5L10,0L0,5")
+                        .attr(
+                            "fill",
+                            (d) =>
+                                config.linkColors[
+                                    d === "bidirectional" ? "bidirectional" : d
+                                ],
+                        );
+
+                    // Create simulation
+                    const simulation = d3
+                        .forceSimulation(data.nodes)
+                        .force(
+                            "link",
+                            d3
+                                .forceLink(data.links)
+                                .id((d) => d.id)
+                                .distance(config.linkDistance),
+                        )
+                        .force(
+                            "charge",
+                            d3.forceManyBody().strength(config.chargeStrength),
+                        )
+                        .force("center", d3.forceCenter(width / 2, height / 2))
+                        .force(
+                            "collision",
+                            d3
+                                .forceCollide()
+                                .radius((d) => radiusScale(d.amount) + 5),
+                        );
+
+                    // Create link lines
+                    const link = svg
+                        .append("g")
+                        .attr("class", "links")
+                        .selectAll("line")
+                        .data(data.links)
+                        .join("line")
+                        .attr("class", "link")
+                        .attr("stroke-width", (d) => linkScale(d.value))
+                        .attr("stroke", (d) => {
+                            if (d.forward > 0 && d.backward > 0)
+                                return config.linkColors.bidirectional;
+                            return d.direction === "forward"
+                                ? config.linkColors.forward
+                                : config.linkColors.backward;
+                        })
+                        .attr("marker-end", (d) => {
+                            if (d.forward > 0 && d.backward > 0)
+                                return "url(#arrow-bidirectional)";
+                            return d.direction === "forward"
+                                ? "url(#arrow-forward)"
+                                : "url(#arrow-backward)";
+                        });
+
+                    // Create node groups
+                    const node = svg
+                        .append("g")
+                        .attr("class", "nodes")
+                        .selectAll("g")
+                        .data(data.nodes)
+                        .join("g")
+                        .call(
+                            d3
+                                .drag()
+                                .on("start", dragstarted)
+                                .on("drag", dragged)
+                                .on("end", dragended),
+                        );
+
+                    // Add circles to nodes
+                    node.append("circle")
+                        .attr("class", "node")
+                        .attr("r", (d) => radiusScale(d.amount))
+                        .attr("fill", (d) => {
+                            if (d.address.toLowerCase().includes("dead"))
+                                return config.nodeColors.burn;
+                            return d.is_contract
+                                ? config.nodeColors.contract
+                                : config.nodeColors.wallet;
+                        })
+                        .on("mouseover", function (event, d) {
+                            tooltip.style("visibility", "visible").html(`
+                                    <strong>${d.name || d.address}</strong><br>
+                                    Balance: ${d.amount.toLocaleString()} ${data.metadata.tokenSymbol}<br>
+                                    ${d.is_contract ? "Contract" : "Wallet"}<br>
+                                    ${d.percentage ? `Owns ${d.percentage.toFixed(2)}% of supply` : ""}
+                                `);
+                        })
+                        .on("mousemove", function (event) {
+                            tooltip
+                                .style("top", event.pageY - 10 + "px")
+                                .style("left", event.pageX + 10 + "px");
+                        })
+                        .on("mouseout", function () {
+                            tooltip.style("visibility", "hidden");
+                        });
+
+                    // Add labels to large enough nodes
+                    node.filter(
+                        (d) => radiusScale(d.amount) > config.labelThreshold,
+                    )
+                        .append("text")
+                        .attr("class", "node-label")
+                        .attr("dy", 4)
+                        .text((d) => {
+                            const name = d.name || d.address;
+                            return name.length > 15
+                                ? name.substring(0, 12) + "..."
+                                : name;
+                        });
+
+                    // Update positions on tick
+                    simulation.on("tick", () => {
+                        link.attr("x1", (d) => d.source.x)
+                            .attr("y1", (d) => d.source.y)
+                            .attr("x2", (d) => d.target.x)
+                            .attr("y2", (d) => d.target.y);
+
+                        node.attr(
+                            "transform",
+                            (d) => `translate(${d.x},${d.y})`,
+                        );
+                    });
+
+                    // Add zoom/pan
+                    const zoom = d3
+                        .zoom()
+                        .scaleExtent([0.3, 5])
+                        .on("zoom", (event) => {
+                            svg.selectAll(".nodes").attr(
+                                "transform",
+                                event.transform,
+                            );
+                            svg.selectAll(".links").attr(
+                                "transform",
+                                event.transform,
+                            );
+                        });
+
+                    svg.call(zoom).call(
+                        zoom.transform,
+                        d3.zoomIdentity
+                            .translate(width / 2, height / 2)
+                            .scale(config.defaultZoomScale),
+                    );
+
+                    // Drag functions
+                    function dragstarted(event, d) {
+                        if (!event.active)
+                            simulation.alphaTarget(0.3).restart();
+                        d.fx = d.x;
+                        d.fy = d.y;
+                    }
+
+                    function dragged(event, d) {
+                        d.fx = event.x;
+                        d.fy = event.y;
+                    }
+
+                    function dragended(event, d) {
+                        if (!event.active) simulation.alphaTarget(0);
+                        d.fx = null;
+                        d.fy = null;
+                    }
+
+                    // Helper to fit graph to view
+                    function fitGraph() {
+                        const bounds = {
+                            xMin: Infinity,
+                            xMax: -Infinity,
+                            yMin: Infinity,
+                            yMax: -Infinity,
+                        };
+                        data.nodes.forEach((node) => {
+                            if (node.x && node.y) {
+                                bounds.xMin = Math.min(bounds.xMin, node.x);
+                                bounds.xMax = Math.max(bounds.xMax, node.x);
+                                bounds.yMin = Math.min(bounds.yMin, node.y);
+                                bounds.yMax = Math.max(bounds.yMax, node.y);
+                            }
+                        });
+
+                        const padding = 50;
+                        const graphWidth = bounds.xMax - bounds.xMin;
+                        const graphHeight = bounds.yMax - bounds.yMin;
+                        const scale = Math.min(
+                            (width - 2 * padding) / graphWidth,
+                            (height - 2 * padding) / graphHeight,
+                            config.defaultZoomScale,
+                        );
+
+                        const translateX =
+                            (width - graphWidth * scale) / 2 -
+                            bounds.xMin * scale;
+                        const translateY =
+                            (height - graphHeight * scale) / 2 -
+                            bounds.yMin * scale;
+
+                        svg.transition()
+                            .duration(750)
+                            .call(
+                                zoom.transform,
+                                d3.zoomIdentity
+                                    .translate(translateX, translateY)
+                                    .scale(scale),
+                            );
+                    }
+
+                    // Initial fit
+                    setTimeout(fitGraph, 100);
+                }
+
+                return { initialize };
+            })();
+
+            // Sample data (replace with your actual data injection)
+
+
+            // Initialize with sample data (replace with your actual data)
+            BubbleMap.initialize("svg", sampleData, {
+                topTraderCount: 5,
+                radiusRange: [20, 80],
+                linkDistance: 200,
+                defaultZoomScale: 1.3,
+            });
+        </script>
     </body>
 </html>
