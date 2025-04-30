@@ -32,6 +32,7 @@ ELEMENTS_TO_REMOVE = [
 ]
 TOKEN_TEMPLATE_PATH = "../static/token.html"
 BUBBLE_MAP_TEMPLATE = "../static/bubble_map.html"
+TOP_TRADERS_TEMPLATE = "../static/top_traders.html"
 COINGECKO_SEARCH_API_URL = (
     "https://api.coingecko.com/api/v3/search?query={token_symbol}"
 )
@@ -259,7 +260,6 @@ async def process_batch(
             res = await session.get(url)
             if res.status_code == 429:
                 wait = int(res.headers.get("Retry-After", 10))
-                print(wait)
                 logger.debug(f"Rate limit hit, waiting {wait}s")
                 await asyncio.sleep(wait)
                 continue
@@ -372,7 +372,7 @@ async def run(contract_address: str, chain: str, ibm_storage: IBMStorage):
 
         logger.info("Generating HTML page screenshot")
         token_html = render_html_template(
-            "../static/token.html",
+            TOKEN_TEMPLATE_PATH,
             token=token_data,
             metrics=token_metrics,
             root_dir=return_base_dir(),
@@ -416,6 +416,20 @@ async def run(contract_address: str, chain: str, ibm_storage: IBMStorage):
         raise
 
 
+async def top_traders_page_url(
+    contract_address: str, chain: str, ibm_storage: IBMStorage
+):
+    data = await get_token_bubble_map(contract_address=contract_address, chain=chain)
+    template = render_html_template(TOP_TRADERS_TEMPLATE, chart_data=data)
+    page_url, _ = ibm_storage.upload_bytes(
+        template.encode(),
+        f"{chain}-{contract_address}.html",
+        "top-traders",
+    )
+    logger.info("HTML top traders page generated for %s-%s", chain, contract_address)
+    return page_url
+
+
 if __name__ == "__main__":
     from ibm_storage import IBMStorage
     from settings import CoinGeckoAPISettings, IBMSettings
@@ -431,8 +445,6 @@ if __name__ == "__main__":
 
     # asyncio.run(run(**token))
     # print(asyncio.run(search_token("usdt", "eth")))
-    print(
-        asyncio.run(
-            search_token(coinSettings.coin_gecko_api_key, symbol="abc", chain="ethereum")
-        )
-    )
+# asyncio.run(
+#    search_token(coinSettings.coin_gecko_api_key, symbol="abc", chain="ethereum")
+# )
