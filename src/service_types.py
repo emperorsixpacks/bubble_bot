@@ -1,8 +1,36 @@
 from datetime import datetime
+from enum import StrEnum
 from typing import Optional
 
 from aiogram.fsm.state import State, StatesGroup
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
+
+
+class Chain(StrEnum):
+    ETH = "eth"
+    BSC = "bsc"
+    FTM = "ftm"
+    AVAX = "avax"
+    CRO = "cro"
+    ARBI = "arbi"
+    POLY = "poly"
+    BASE = "base"
+    SOL = "sol"
+    SONIC = "sonic"
+
+
+CHAIN_MAPPING = {
+    "eth": "ethereum",
+    "bsc": "binance-smart-chain",
+    "ftm": "fantom",
+    "avax": "avalanche",
+    "cro": "cronos",
+    "arbi": "arbitrum",
+    "poly": "polygon",
+    "base": "base",
+    "sol": "solana",
+    "sonic": "sonic",  # (sonic is not standard on CG yet, might have to verify)
+}
 
 
 class TokenSelection(StatesGroup):
@@ -10,10 +38,10 @@ class TokenSelection(StatesGroup):
 
 
 class Error(Exception):
-    message: str
+    message: str | None
     field: str | None
 
-    def __init__(self, message: str):
+    def __init__(self, message: str | None = None):
         self.message = message
         super().__init__(message)
 
@@ -80,3 +108,11 @@ class TelegramCommand(Base):
     token_metrics: TokenMetrics
     token_data: TokenCoinData
     screenshot_url: str
+
+
+class CoinGeckoSearch(Base):
+    coin_gecko_id: str
+    name: str
+    symbol: str
+    chain: str | None = None
+    contract_address: str | None = None

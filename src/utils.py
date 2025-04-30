@@ -13,7 +13,7 @@ from jinja2 import Environment, FileSystemLoader
 from PIL import Image
 
 from logger import get_logger
-from service_types import Chain, Error, error
+from service_types import CHAIN_MAPPING, Chain, Error, error
 
 if TYPE_CHECKING:
     from ibm_storage import IBMStorage
@@ -29,6 +29,13 @@ def to_chain(value: str) -> tuple[Chain | None, error]:
     except ValueError:
         return None, Error(f"{value} is not a valid chain")
     return chain, None
+
+
+def get_chain_full_name(value) -> tuple[str | None, error]:
+    chain_name = CHAIN_MAPPING.get(value, None)
+    if chain_name is None:
+        return None, Error(f"{value} not found")
+    return chain_name, None
 
 
 def return_base_dir():
