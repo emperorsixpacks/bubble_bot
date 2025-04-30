@@ -1,4 +1,3 @@
 help - See commands
 bm - Get top traders bubble map
 bi - Get token info with bubble map
-
