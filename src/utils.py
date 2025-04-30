@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import os
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -10,33 +12,23 @@ import imgkit
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image
 
-from enum import StrEnum
 from logger import get_logger
-
-# Set up logging
-logger = get_logger()
+from service_types import Chain, Error, error
 
 if TYPE_CHECKING:
     from ibm_storage import IBMStorage
     from service_types import TokenCoinData, TokenMetrics
 
+# Set up logging
+logger = get_logger()
 
-class Chain(StrEnum):
-    ETH = "eth"
-    BSC = "bsc"
-    FTM = "ftm"
-    AVAX = "avax"
-    CRO = "cro"
-    ARBI = "arbi"
-    POLY = "poly"
-    BASE = "base"
-    SOL = "sol"
-    SONIC = "sonic"
 
-    # Optional: Add helper methods
-    @classmethod
-    def is_evm(cls, chain: "Chain") -> bool:
-        return chain not in {cls.SOL, cls.SONIC}  # Adjust based on your logic
+def to_chain(value: str) -> tuple[Chain | None, error]:
+    try:
+        chain = Chain(value)
+    except ValueError:
+        return None, Error(f"{value} is not a valid chain")
+    return chain, None
 
 
 def return_base_dir():
@@ -46,6 +38,68 @@ def return_base_dir():
     return base_dir
 
 
+class AsyncRequestSession:
+    def __init__(self, headers: dict = None):
+        self.headers = headers or {}
+        self.client = None
+
+    async def __aenter__(self):
+        self.client = httpx.AsyncClient(headers=self.headers)
+        logger.info("[Session] Client created.")
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.client.aclose()
+        logger.info("[Session] Client closed.")
+
+    async def get(self, url: str):
+        logger.info(f"[Session] Sending GET request to: {url}")
+        try:
+            response = await self.client.get(url)
+            logger.debug(f"[Session] Response status: {response.status_code}")
+            return response
+        except Exception as e:
+            logger.error(f"[Session] Error sending request to {url}: {str(e)}")
+            raise
+
+
+class CoinGeckoRateLimiter:
+    """Strict 30 requests/minute rate limiter for CoinGecko API"""
+
+    __instance = None
+
+    def __new__(cls):
+        if cls.__instance is None:
+            cls.__instance = super().__new__(cls)
+            cls.__instance.reset()
+        return cls.__instance
+
+    def reset(self):
+        self.request_times = []
+        self.limit = 30
+        self.period = 60  # seconds
+        self.last_burst = time.time()
+
+    async def acquire(self):
+        now = time.time()
+
+        # Remove expired requests (older than 1 minute)
+        self.request_times = [t for t in self.request_times if now - t < self.period]
+
+        # If we've hit the limit, wait until the oldest request expires
+        if len(self.request_times) >= self.limit:
+            oldest = self.request_times[0]
+            wait_time = self.period - (now - oldest)
+            await asyncio.sleep(wait_time)
+            now = time.time()  # Update time after waiting
+            self.request_times = [
+                t for t in self.request_times if now - t < self.period
+            ]
+
+        self.request_times.append(now)
+
+
+# TODO close the connection
 async def send_request(url: str):
     logger.info(f"Sending request to: {url}")
     try:
@@ -56,6 +110,16 @@ async def send_request(url: str):
     except Exception as e:
         logger.error(f"Error sending request to {url}: {str(e)}")
         raise
+
+
+async def image_from_url(url) -> tuple[io.BytesIO | None, error]:
+    res = await send_request(url)
+    if res.status_code != 200:
+        return None, error(f"Request error: {res.json()}")
+    content = res.content
+    if not isinstance(content, bytes):
+        return None, Error("This is not a url")
+    return io.BytesIO(content), None
 
 
 def render_html_template(template_path: str, **kwargs) -> str:
@@ -178,7 +242,7 @@ def generate_token_description_text(token: TokenCoinData, metrics: TokenMetrics)
     if token.community_data.telegram_channel:
         logger.debug(f"Added Telegram: {token.community_data.telegram_channel}")
         community_links.append(
-            f"📢 [Telegram]({token.community_data.telegram_channel})"
+            f"📢 [Telegram](https://t.me/{token.community_data.telegram_channel})"
         )
 
     if token.community_data.repo:
