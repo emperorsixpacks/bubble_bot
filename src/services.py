@@ -289,9 +289,9 @@ async def process_batch(
     return batch_results
 
 
-async def filter_by_chain(session, *, data: list[CoinGeckoSearch], chain: str) -> tuple(
-    CoinGeckoSearch | None, error
-):
+async def filter_by_chain(
+    session, *, data: list[CoinGeckoSearch], chain: str
+) -> tuple[CoinGeckoSearch | None]:
     BATCH_SIZE = 5
     all_results = []
     for i in range(0, len(data), BATCH_SIZE):
@@ -299,13 +299,13 @@ async def filter_by_chain(session, *, data: list[CoinGeckoSearch], chain: str) -
         results = await process_batch(session, batch, chain)
         if len(results) == 0:
             continue
-        all_results.append(results)
+        all_results.extend([result for items in results for result in results])
     return all_results
 
 
-async def search_token(coin_gecko_api_key: str, *, symbol: str, chain: str) -> tuple(
-    list[CoinGeckoSearch], error
-):
+async def search_token(
+    coin_gecko_api_key: str, *, symbol: str, chain: str
+) -> tuple[list[CoinGeckoSearch], error]:
     async with AsyncRequestSession(
         headers={"x-cg-demo-api-key": coin_gecko_api_key}
     ) as session:
@@ -327,7 +327,7 @@ async def search_token(coin_gecko_api_key: str, *, symbol: str, chain: str) -> t
             )
             for coin in filtered_coins
         ]
-        return await filter_by_chain(session, data=result, chain=chain)
+        return await filter_by_chain(session, data=result, chain=chain), None
 
 
 async def run(contract_address: str, chain: str, ibm_storage: IBMStorage):
