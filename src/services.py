@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
 import numpy as np
-from httpx import AsyncClient
 from playwright.async_api import async_playwright
 
 from logger import get_logger
@@ -246,7 +245,7 @@ async def get_page_screenshot(
 
 
 async def process_batch(
-    session: AsyncClient, batch: list[CoinGeckoSearch], chain: str
+    session: AsyncRequestSession, batch: list[CoinGeckoSearch], chain: str
 ) -> list[CoinGeckoSearch]:
     batch_results = []
     MAX_RETRIES = 2
@@ -260,6 +259,8 @@ async def process_batch(
             res = await session.get(url)
             if res.status_code == 429:
                 wait = int(res.headers.get("Retry-After", 10))
+                print(wait)
+                logger.debug(f"Rate limit hit, waiting {wait}s")
                 await asyncio.sleep(wait)
                 continue
             if res.status_code != 200:
@@ -296,18 +297,17 @@ async def filter_by_chain(session, *, data: list[CoinGeckoSearch], chain: str) -
     for i in range(0, len(data), BATCH_SIZE):
         batch = data[i : i + BATCH_SIZE]
         results = await process_batch(session, batch, chain)
+        if len(results) == 0:
+            continue
         all_results.append(results)
     return all_results
 
 
-async def search_token(
-    coin_gecko_api: CoinGeckoAPISettings, *, symbol: str, chain: str
-) -> tuple(list[CoinGeckoSearch], error):
+async def search_token(coin_gecko_api_key: str, *, symbol: str, chain: str) -> tuple(
+    list[CoinGeckoSearch], error
+):
     async with AsyncRequestSession(
-        headers={
-            "x-cg-pro-api-key": coin_gecko_api.coin_gecko_api_key,
-            "accept": "application/json",
-        }
+        headers={"x-cg-demo-api-key": coin_gecko_api_key}
     ) as session:
         url = COINGECKO_SEARCH_API_URL.format(token_symbol=symbol)
         response = await session.get(url)
@@ -431,4 +431,8 @@ if __name__ == "__main__":
 
     # asyncio.run(run(**token))
     # print(asyncio.run(search_token("usdt", "eth")))
-    print(asyncio.run(search_token(coinSettings, symbol="usdt", chain="solana")))
+    print(
+        asyncio.run(
+            search_token(coinSettings.coin_gecko_api_key, symbol="usdt", chain="solana")
+        )
+    )
