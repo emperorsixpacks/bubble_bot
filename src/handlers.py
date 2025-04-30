@@ -54,7 +54,15 @@ async def bm_command_handler(message: Message):
         r"^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})/([a-zA-Z]+)$"
     )
 
-    _, token = message.text.split(" ")
+    user_q = message.text.split(" ")
+    if len(user_q) != 2:
+        await message.reply(
+            """
+            Please send contract address in format: contract_address/chain\nExample: 0x123...abc/eth, $usdt/eth
+            """
+        )
+        return
+    _, token = user_q
     match = re.match(contract_address_chain_pattern, token.strip())
     if match is None:
         await message.reply(
@@ -101,7 +109,15 @@ async def bi_command_handler(message: Message):
     )
     token_chain_pattern = r"^\$([a-zA-Z0-9]+)/([a-zA-Z]+)$"
 
-    _, token = message.text.split(" ")
+    user_q = message.text.split(" ")
+    if len(user_q) != 2:
+        await message.reply(
+            """
+            Please send contract address in format: contract_address/chain\nExample: 0x123...abc/eth, $usdt/eth
+            """
+        )
+        return
+    _, token = user_q
 
     if match := re.match(token_chain_pattern, token.strip()):
         token, chain = match.groups()
