@@ -34,7 +34,7 @@ ELEMENTS_TO_REMOVE = [
 TOKEN_TEMPLATE_PATH = "../static/token.html"
 BUBBLE_MAP_TEMPLATE = "../static/bubble_map.html"
 COINGECKO_SEARCH_API_URL = (
-    "https://api.coingecko.com/api/v3/search?query={token_symbol}"
+    "https://pro-api.coingecko.com/api/v3/search?query={token_symbol}"
 )
 COINGECKO_GET_TOKEN_URL = "https://api.coingecko.com/api/v3/coins/{token_id}"
 
@@ -303,7 +303,12 @@ async def filter_by_chain(session, *, data: list[CoinGeckoSearch], chain: str) -
 async def search_token(
     coin_gecko_api: CoinGeckoAPISettings, *, symbol: str, chain: str
 ) -> tuple(list[CoinGeckoSearch], error):
-    async with AsyncRequestSession() as session:
+    async with AsyncRequestSession(
+        headers={
+            "x-cg-pro-api-key": coin_gecko_api.coin_gecko_api_key,
+            "accept": "application/json",
+        }
+    ) as session:
         url = COINGECKO_SEARCH_API_URL.format(token_symbol=symbol)
         response = await session.get(url)
         if response.status_code != 200:
