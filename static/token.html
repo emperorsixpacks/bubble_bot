@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{token.name}} Information</title>
-  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script src="https://cdn.tailwindcss.com/"></script>
   <style>
     .token-card {
       width: 400px;
@@ -26,7 +26,7 @@
 </head>
 
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
-  <div class="token-card bg-white rounded-xl h-auto shadow-lg overflow-hidden flex flex-col">
+  <div id="token-card" class="token-card bg-white rounded-xl h-auto shadow-lg overflow-hidden flex flex-col">
     <!-- Header with Token Image -->
     <div class="flex justify-between items-center p-6 border-b">
       <div>
@@ -53,11 +53,11 @@
             <h2 class="text-lg font-semibold text-gray-800 border-b pb-1">Market Data</h2>
             <div>
               <p class="text-sm text-gray-500">Price</p>
-              <p class="text-xl font-bold text-gray-900">${{token.price}}</p>
+              <p class="text-xl font-bold text-gray-900">${{ "{:,.0f}".format(token.price)}}</p>
             </div>
             <div>
               <p class="text-sm text-gray-500">Market Cap</p>
-              <p class="text-xl font-bold text-gray-900">${{token.market_cap}}</p>
+              <p class="text-xl font-bold text-gray-900">${{ "{:,.0f}".format(token.market_cap) }}</p>
             </div>
             <div>
               <p class="text-sm text-gray-500">Volume (24h)</p>
