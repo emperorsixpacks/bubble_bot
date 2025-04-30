@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html>
     <head>
@@ -66,7 +65,29 @@
                 text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
                 pointer-events: none;
             }
-
+            .zoom-controls {
+                position: absolute;
+                top: 100px;
+                right: 30px;
+                z-index: 100;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .zoom-controls button {
+                background: rgba(30, 30, 60, 0.8);
+                color: white;
+                border: 1px solid #4a4a8a;
+                border-radius: 4px;
+                padding: 8px 12px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: all 0.2s;
+            }
+            .zoom-controls button:hover {
+                background: rgba(60, 60, 100, 0.8);
+                transform: scale(1.05);
+            }
             .link {
                 stroke-opacity: 0.6;
             }
@@ -89,6 +110,11 @@
         <div id="legend"></div>
         <div id="visualization-container">
             <svg width="100%" height="100%"></svg>
+        </div>
+        <div class="zoom-controls">
+            <button id="zoom-in">+ Zoom In</button>
+            <button id="zoom-out">- Zoom Out</button>
+            <button id="reset-zoom">Reset Zoom</button>
         </div>
         <div class="tooltip"></div>
 
@@ -118,6 +144,34 @@
                     labelThreshold: 30,
                 };
 
+                let currentZoom = d3.zoomIdentity.scale(config.defaultZoomScale);
+                const zoom = d3.zoom()
+                    .scaleExtent([0.3, 5])
+                    .on("zoom", (event) => {
+                        currentZoom = event.transform;
+                        svg.selectAll(".nodes").attr("transform", currentZoom);
+                        svg.selectAll(".links").attr("transform", currentZoom);
+                    });
+
+                svg.call(zoom).call(zoom.transform, currentZoom);
+
+                // Add button event handlers
+                d3.select("#zoom-in").on("click", () => {
+                    currentZoom = currentZoom.scale(1.2);
+                    svg.transition().duration(200).call(zoom.transform, currentZoom);
+                });
+
+                d3.select("#zoom-out").on("click", () => {
+                    currentZoom = currentZoom.scale(0.8);
+                    svg.transition().duration(200).call(zoom.transform, currentZoom);
+                });
+
+                d3.select("#reset-zoom").on("click", () => {
+                    currentZoom = d3.zoomIdentity
+                        .translate(width / 2, height / 2)
+                        .scale(config.defaultZoomScale);
+                    svg.transition().duration(300).call(zoom.transform, currentZoom);
+                });
                 // Process raw data into visualization format
                 function processData(rawData, config) {
                     // Create node map by index
