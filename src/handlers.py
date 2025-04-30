@@ -4,23 +4,21 @@ from warnings import resetwarnings
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import (
-    CallbackQuery,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    InputFile,
-    Message,
-)
+from aiogram.types import (CallbackQuery, InlineKeyboardButton,
+                           InlineKeyboardMarkup, InputFile, Message)
+from httpx import delete
 
 from ibm_storage import IBMStorage
 from logger import get_logger
 from service_types import Chain, Error, TokenSelection, error
-from services import run
-from settings import IBMSettings
-from utils import generate_token_description_text, to_chain
+from services import run, search_token, top_traders_page_url
+from settings import CoinGeckoAPISettings, IBMSettings
+from utils import (generate_token_description_text, get_chain_full_name,
+                   to_chain)
 
 temp_token_data = {}
 ibm_settings = IBMSettings()
+coin_gecko_settings = CoinGeckoAPISettings()
 ibm_storage = IBMStorage(ibm_settings)
 token_router = Router(name=__name__)
 logger = get_logger()
@@ -38,10 +36,6 @@ async def process_and_reply(
             response.token_data, response.token_metrics
         )
 
-        # photo, err = await image_from_url(response.screenshot_url)
-        # if err:
-        #   logger.error(err.message)
-        #  return err
         send_photo_message = await message.reply_photo(
             photo=response.screenshot_url, caption=f"{contract_address}/{chain}"
         )
@@ -54,8 +48,54 @@ async def process_and_reply(
         return Error(str(e))
 
 
-@token_router.message(Command("bi"))
+@token_router.message(Command("bm"))
 async def bm_command_handler(message: Message):
+    contract_address_chain_pattern = (
+        r"^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})/([a-zA-Z]+)$"
+    )
+
+    _, token = message.text.split(" ")
+    match = re.match(contract_address_chain_pattern, token.strip())
+    if match is None:
+        await message.reply(
+            """
+            Please send contract address in format: contract_address/chain\nExample: 0x123...abc/eth
+            """
+        )
+        return
+
+    contract_address, chain = match.groups()
+    chain, err = to_chain(chain)
+    if err:
+        await message.reply(
+            f"""
+            {chain} is not a valid chain, chain must be {[chain.value for chain in Chain]}
+            """
+        )
+        return
+    response_message = await message.reply(
+        f"Getting info for {contract_address} on {chain.upper()}"
+    )
+    visualization_url = await top_traders_page_url(
+        ibm_storage=ibm_storage, chain=chain, contract_address=contract_address
+    )
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Open Interactive Visualization", url=visualization_url
+                )
+            ]
+        ]
+    )
+    await response_message.delete()
+    await message.reply(
+        "Here's your token network visualization:", reply_markup=keyboard
+    )
+
+
+@token_router.message(Command("bi"))
+async def bi_command_handler(message: Message):
     contract_address_chain_pattern = (
         r"^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})/([a-zA-Z]+)$"
     )
@@ -112,45 +152,48 @@ async def handle_contract_address(message: Message, contract_address, chain) -> 
     return err
 
 
-async def handle_token_name(message: Message, state: FSMContext, token, chain):
-    # Check if message matches $token_symbol/chain pattern
-
+async def handle_token_name(message: Message, token, chain):
+    response_message = await message.reply(
+        f"Getting info for {token} on {chain.upper()}"
+    )
+    chain_full_name, _ = get_chain_full_name(chain)
     # Fetch token options from API
-    token_options = await fetch_token_options(symbol, chain)
-
-    if not token_options:
-        await message.reply(
+    token_options, err = await search_token(
+        coin_gecko_settings.coin_gecko_api_key, symbol=token, chain=chain_full_name
+    )
+    if len(token_options) == 0 or err:
+        logger.error("Handler error %s", err.message)
+        await response_message.edit_text(
             f"❌ No tokens found for ${token} on {chain.upper()} chain"
         )
         return
 
     if len(token_options) == 1:
-        # Only one option - process immediately
-        contract_address = token_options[0]["address"]
-        await process_and_reply(message, contract_address, chain)
-    else:
-        # Multiple options - present selection
-        keyboard = InlineKeyboardMarkup()
-        for idx, token in enumerate(token_options):
-            keyboard.add(
-                InlineKeyboardButton(
-                    text=f"{token['name']} ({token['address'][:6]}...{token['address'][-4:]})",
-                    callback_data=f"select_token:{idx}",
-                )
+        await process_and_reply(message, token_options[0].contract_address, chain)
+        await response_message.delete()
+        return
+    # Multiple options - present selection
+    keyboard = InlineKeyboardMarkup()
+    for idx, tkn in enumerate(token_options):
+        keyboard.add(
+            InlineKeyboardButton(
+                text=f"{tkn.name} ({tkn.contract_address[:6]}...{tkn.contract_address[-4:]})",
+                callback_data=f"select_token:{idx}",
             )
-
-        # Store options in temporary storage
-        temp_token_data[message.from_user.id] = {
-            "options": token_options,
-            "chain": chain,
-            "original_message_id": message.message_id,
-        }
-
-        await message.reply(
-            f"🔍 Multiple tokens found for ${symbol} on {chain.upper()} chain:",
-            reply_markup=keyboard,
         )
-        await TokenSelection.waiting_for_selection.set()
+
+    # Store options in temporary storage
+    temp_token_data[message.from_user.id] = {
+        "options": token_options,
+        "chain": chain,
+        "original_message_id": message.message_id,
+    }
+
+    await message.reply(
+        f"🔍 Multiple tokens found for ${token} on {chain.upper()} chain:",
+        reply_markup=keyboard,
+    )
+    await TokenSelection.waiting_for_selection.set()
 
 
 async def handle_token_selection(callback_query: CallbackQuery, state: FSMContext):
@@ -186,3 +229,6 @@ async def handle_token_selection(callback_query: CallbackQuery, state: FSMContex
     # Clean up
     del temp_token_data[user_id]
     await state.finish()
+
+
+# TODO add a disclaimer for the $token/chain handler
